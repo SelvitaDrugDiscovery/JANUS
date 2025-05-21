@@ -73,7 +73,7 @@ def get_joint_sim(all_smiles, starting_smile, target_smile):
     )  # similarity to starting structure
     data = np.array([scores_target, scores_start])
 
-    avg_score = np.average(data, axis=0)
+    avg_score = np.mean(data, axis=0)
     better_score = avg_score - (np.abs(data[0] - data[1]))
     better_score = (
         ((1 / 9) * better_score ** 3)
@@ -195,8 +195,11 @@ def perform_crossover(comb_smi, num_random_samples):
     collect_smiles = []
     for smi_1 in randomized_smile_orderings_a:
         for smi_2 in randomized_smile_orderings_b:
-            for item in obtain_path(smi_1, smi_2):
-                collect_smiles.append(item)
+            try:
+                for item in obtain_path(smi_1, smi_2):
+                    collect_smiles.append(item)
+            except:
+                continue
 
     collect_smiles_canon = []
     for item in collect_smiles:
@@ -243,7 +246,6 @@ def crossover_smiles(smiles_join, crossover_num_random_samples):
         med_all = map_[key_]
         smi_1, smi_2 = key_.split("xxx")
         joint_sim = get_joint_sim(med_all, smi_1, smi_2)
-
         joint_sim_ord = np.argsort(joint_sim)
         joint_sim_ord = joint_sim_ord[::-1]
 

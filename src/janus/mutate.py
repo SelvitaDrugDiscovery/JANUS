@@ -8,12 +8,10 @@ Created on Sat Jul 31 12:15:57 2021
 from typing import Dict
 import random
 import multiprocessing
-
 import rdkit
 from rdkit import Chem
 
 import selfies 
-from selfies import encoder, decoder
 
 from .utils import get_selfies_chars
 
@@ -121,7 +119,17 @@ def mutate_smiles(
         )
 
     # Convert all the molecules to SELFIES
-    selfies_ls = [encoder(x) for x in randomized_smile_orderings]
+    selfies_ls = []
+    for x in randomized_smile_orderings:
+        iters = 0
+        while iters < 100:
+            try:
+                encoded_x = selfies.encoder(x)
+                selfies_ls.append(encoded_x)
+                break
+            except:
+                iters += 1
+                continue
     selfies_ls_chars = [get_selfies_chars(selfie) for selfie in selfies_ls]
 
     # Obtain the mutated selfies
@@ -138,7 +146,13 @@ def mutate_smiles(
                     )
                 )
 
-    mutated_smiles = [decoder(x) for x in mutated_sf]
+    mutated_smiles = []
+    for x in mutated_sf:
+        try:
+            decoded_sf = selfies.decoder(x)
+            mutated_smiles.append(decoded_sf)
+        except:
+            continue
     mutated_smiles_canon = []
     for item in mutated_smiles:
         try:

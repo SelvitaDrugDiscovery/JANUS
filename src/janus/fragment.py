@@ -56,7 +56,10 @@ def form_fragments(smi):
     selfies_frags = []
     unique_frags = get_frags(smi, radius=3)
     for item in unique_frags:
-        sf = encoder(item)
+        try:
+            sf = encoder(item)
+        except:
+            return []
         if sf is None:
             continue
         dec_ = decoder(sf)
@@ -68,13 +71,12 @@ def form_fragments(smi):
                 m, canonical=False, isomericSmiles=False, kekuleSmiles=True
             )
             dearom_mol = Chem.MolFromSmiles(dearom_smiles)
+            selfies_frags.append(encoder(dearom_smiles))
         except:
             continue
 
         if dearom_mol == None:
             raise Exception("mol dearom failes")
-
-        selfies_frags.append(encoder(dearom_smiles))
 
     return selfies_frags
 
