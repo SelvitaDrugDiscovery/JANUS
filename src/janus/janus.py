@@ -42,7 +42,8 @@ class JANUS:
         crossover_num_random_samples: Optional[int] = 1,
         exploit_num_random_samples: Optional[int] = 400,
         exploit_num_mutations: Optional[int] = 400,
-        top_mols: Optional[int] = 1
+        top_mols: Optional[int] = 1,
+        max_same_best: Optional[int] = 5
     ):
 
         # set all class variables
@@ -66,7 +67,8 @@ class JANUS:
         self.exploit_num_random_samples = exploit_num_random_samples
         self.exploit_num_mutations = exploit_num_mutations
         self.top_mols = top_mols
-
+        self.best_per_population_counter = dict()
+        self.max_same_best = max_same_best
         # create dump folder
         if not os.path.isdir(f"./{self.work_dir}"):
             os.mkdir(f"./{self.work_dir}")
@@ -92,8 +94,11 @@ class JANUS:
         # make fragments from initial smiles
         self.frag_alphabet = []
         if self.use_fragments:
-            with multiprocessing.Pool(self.num_workers) as pool:
-                frags = pool.map(form_fragments, init_smiles)
+            # with multiprocessing.Pool(self.num_workers) as pool:
+            #     frags = pool.map(form_fragments, init_smiles)
+            frags = []
+            for item in init_smiles:
+                frags.append(form_fragments(item))
             frags = self.flatten_list(frags)
             print(f"    Unique and valid fragments generated: {len(frags)}")
             self.frag_alphabet.extend(frags)
@@ -135,31 +140,38 @@ class JANUS:
             raise ValueError('Invalid space, choose "local" or "explore".')
 
         smi_list = smi_list * num_random_samples
-        with multiprocessing.Pool(self.num_workers) as pool:
-            mut_smi_list = pool.map(
-                partial(
-                    mutate_smiles,
-                    alphabet=self.frag_alphabet,
-                    num_random_samples=1,
-                    num_mutations=num_mutations,
-                    num_sample_frags=self.num_sample_frags,
-                    base_alphabet=self.alphabet
-                ),
-                smi_list,
-            )
+        mut_smi_list = []
+        for smi in smi_list:
+            mutated_smi = partial(mutate_smiles, alphabet=self.frag_alphabet, num_random_samples=1, num_mutations=num_mutations, num_sample_frags=self.num_sample_frags, base_alphabet=self.alphabet)(smi)
+            mut_smi_list.append(mutated_smi)
+                #with multiprocessing.Pool(self.num_workers) as pool:
+            # mut_smi_list = pool.map(
+            #     partial(
+            #         mutate_smiles,
+            #         alphabet=self.frag_alphabet,
+            #         num_random_samples=1,
+            #         num_mutations=num_mutations,
+            #         num_sample_frags=self.num_sample_frags,
+            #         base_alphabet=self.alphabet
+            #     ),
+            #     smi_list,
+            # )
         mut_smi_list = self.flatten_list(mut_smi_list)
         return mut_smi_list
 
     def crossover_smi_list(self, smi_list: List[str]):
         # parallelized crossover function
-        with multiprocessing.Pool(self.num_workers) as pool:
-            cross_smi = pool.map(
-                partial(
-                    crossover_smiles,
-                    crossover_num_random_samples=self.crossover_num_random_samples,
-                ),
-                smi_list,
-            )
+        cross_smi = []
+        for item in smi_list:
+            cross_smi.append(crossover_smiles(item, crossover_num_random_samples=self.crossover_num_random_samples))
+        # with multiprocessing.Pool(self.num_workers) as pool:
+        #     cross_smi = pool.map(
+        #         partial(
+        #             crossover_smiles,
+        #             crossover_num_random_samples=self.crossover_num_random_samples,
+        #         ),
+        #         smi_list,
+        #     )
         cross_smi = self.flatten_list(cross_smi)
         return cross_smi
 
@@ -178,7 +190,6 @@ class JANUS:
     def run(self):
         """ Run optimization based on hyperparameters initialized
         """
-
         for gen_ in range(self.generations):
 
             # bookkeeping
@@ -210,7 +221,9 @@ class JANUS:
                 for item in replace_smiles[len(replace_smiles) // 2 :]:
                     smiles_join.append(item + "xxx" + random.choice(keep_smiles))
                 cross_smi_explr = self.crossover_smi_list(smiles_join)
+                print(f"    Crossed over {len(cross_smi_explr)} molecules.")
                 cross_smi_explr = self.check_filters(cross_smi_explr)
+                print(f"    After filtering, {len(cross_smi_explr)} molecules remain.")
 
                 # Combine and get unique smiles not yet found
                 all_smiles = list(set(mut_smi_explr + cross_smi_explr))
@@ -218,7 +231,7 @@ class JANUS:
                     if x not in self.smiles_collector:
                         explr_smiles.append(x)
                 explr_smiles = list(set(explr_smiles))
-
+                print('explr_smiles', len(explr_smiles))
                 timeout_counter += 1
                 if timeout_counter % 100 == 0:
                     print(f'Exploration: {timeout_counter} iterations of filtering. \
@@ -245,13 +258,23 @@ class JANUS:
 
                 # Obtain predictions on unseen molecules:
                 print("    Obtaining Predictions")
-                new_predictions = obtain_model_pred(
-                    explr_smiles,
-                    net,
-                    num_workers=self.num_workers,
-                    use_gpu=self.use_gpu,
-                )
-                sorted_idx = np.argsort(np.squeeze(new_predictions))[::-1]
+                # new_predictions = obtain_model_pred(
+                #     explr_smiles,
+                #     net,
+                #     num_workers=self.num_workers,
+                #     use_gpu=self.use_gpu,
+                # )
+                # REPLACED WITH THE EXACT VALUES FROM THE FITNESS FUNCTION
+                new_predictions = []
+                for smi in explr_smiles:
+                    fit_val = self.fitness_function(smi)
+                    new_predictions.append(fit_val)
+                    if smi in self.smiles_collector:
+                        self.smiles_collector[smi][0] = fit_val
+                    else:
+                        self.smiles_collector[smi] = [fit_val, 1]
+                new_predictions = np.array(new_predictions)
+                sorted_idx = np.argsort(new_predictions)[::-1]
                 replaced_pop = np.array(explr_smiles)[
                     sorted_idx[: self.generation_size - len(keep_smiles)]
                 ].tolist()
@@ -407,14 +430,24 @@ class JANUS:
 
             # Save best of generation!:
             fit_all_best = np.argmax(self.fitness)
-
+            best_current_population = self.population[fit_all_best]
+            if best_current_population in self.best_per_population_counter:
+                self.best_per_population_counter[best_current_population] += 1
+            else:
+                self.best_per_population_counter[best_current_population] = 1
             # write best molecule with best fitness
             with open(
                 os.path.join(self.work_dir, "generation_all_best.txt"), "a+"
             ) as f:
+                
                 f.writelines(
-                    f"Gen:{gen_}, {self.population[fit_all_best]}, {self.fitness[fit_all_best]} \n"
+                    f"Gen:{gen_}, {best_current_population}, {self.fitness[fit_all_best]} \n"
                 )
+            if self.best_per_population_counter[best_current_population] > self.max_same_best:
+                print(
+                    "JANUS has converged to a solution, stopping optimization."
+                )
+                break
 
         return
 

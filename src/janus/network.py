@@ -52,10 +52,14 @@ def get_mol_feature(smi: str) -> np.array:
 
 def obtain_features(smi_list: List[str], num_workers: int = 1):
     assert num_workers <= multiprocessing.cpu_count(), 'num_workers exceed cpu count'
-    with multiprocessing.Pool(num_workers) as pool:
-        dataset_x = pool.map(
-            get_mol_feature, smi_list
-        )
+    dataset_x = []
+    for smi in smi_list:
+        smi_features = get_mol_feature(smi)
+        dataset_x.append(smi_features)
+    # with multiprocessing.Pool(num_workers) as pool:
+    #     dataset_x = pool.map(
+    #         get_mol_feature, smi_list
+    #     )
         
     return np.array(dataset_x)
 
