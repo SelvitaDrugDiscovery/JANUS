@@ -222,7 +222,9 @@ class JANUS:
                     smiles_join.append(item + "xxx" + random.choice(keep_smiles))
                 cross_smi_explr = self.crossover_smi_list(smiles_join)
                 print(f"    Crossed over {len(cross_smi_explr)} molecules.")
+                print(f"    Crossed over {len(cross_smi_explr)} molecules.")
                 cross_smi_explr = self.check_filters(cross_smi_explr)
+                print(f"    After filtering, {len(cross_smi_explr)} molecules remain.")
                 print(f"    After filtering, {len(cross_smi_explr)} molecules remain.")
 
                 # Combine and get unique smiles not yet found
@@ -231,6 +233,7 @@ class JANUS:
                     if x not in self.smiles_collector:
                         explr_smiles.append(x)
                 explr_smiles = list(set(explr_smiles))
+                print('explr_smiles', len(explr_smiles))
                 print('explr_smiles', len(explr_smiles))
                 timeout_counter += 1
                 if timeout_counter % 100 == 0:
