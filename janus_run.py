@@ -80,7 +80,7 @@ def make_fitness_function(model):
       X_fp = np.array([AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048).ToList()])
       activity_score = (model.predict(X_fp).item() - 4) / 7 # scale to ~ [0, 1]
       qed = QED.qed(mol)
-      sa_score = sascorer.calculateScore(mol) / 10 # scale to [0, 1]
+      sa_score = sascorer.calculateScore (mol) / 10 # scale to [0, 1]
       # consider filters in the fitness fucntion
       filter_out = RunFilterCatalog(filters, [smi], numThreads=40)
       # emphasize the activity score by mul by the weight; 
@@ -107,46 +107,6 @@ def custom_filter(smi: str):
           return False
     return len(smi) >= 6 and not has_radicals(mol) and is_neutral(mol) and is_organic(mol) and filter_rings(smi=smi, chembl_rings=chembl_rings, count_threshold=100)
     
-def calculate_tanimoto_similarity(smiles_string, target_molecule_smiles):
-  """
-  Calculates the Tanimoto similarity between a molecule represented by a SMILES string
-  and a target molecule represented by a SMILES string.
-
-  Args:
-    smiles_string:  The SMILES string of the first molecule.
-    target_molecule_smiles: The SMILES string of the target molecule.
-
-  Returns:
-    The Tanimoto similarity score (a float between 0.0 and 1.0), or None if either SMILES string
-    cannot be parsed into a valid molecule.
-  """
-  try:
-    # Create RDKit molecule objects from SMILES strings
-    molecule = Chem.MolFromSmiles(smiles_string)
-    target_molecule = Chem.MolFromSmiles(target_molecule_smiles)
-
-    # Check if molecule objects are valid
-    if molecule is None:
-      print(f"Error: Could not parse SMILES string: {smiles_string}")
-      return None  # Or raise an exception, depending on desired behavior
-
-    if target_molecule is None:
-      print(f"Error: Could not parse SMILES string: {target_molecule_smiles}")
-      return None  # Or raise an exception
-
-    # Generate Morgan fingerprints (ECFP4) for both molecules
-    fp1 = AllChem.GetMorganFingerprintAsBitVect(molecule, 2, nBits=2048)  # Radius 2 (ECFP4), 2048 bits
-    fp2 = AllChem.GetMorganFingerprintAsBitVect(target_molecule, 2, nBits=2048)
-
-    # Calculate Tanimoto similarity
-    tanimoto_similarity = TanimotoSimilarity(fp1, fp2)
-
-    return tanimoto_similarity
-
-  except Exception as e:
-    print(f"An error occurred: {e}")
-    return None  # Or raise the exception, depending on your needs
-
 torch.multiprocessing.freeze_support()
 
 # all parameters to be set, below are defaults
@@ -166,8 +126,8 @@ params_dict = {
     # Fragments from starting population used to extend alphabet for mutations
     "use_fragments": False,
 
-    # An option to use a classifier as selection bias
-    "use_classifier": True,
+    # An option to use a random sampling when filtering the molecule overflow
+    "use_random": False,
 
     # max number of same best molecules in a generation
     "max_same_best": 5,
@@ -179,7 +139,7 @@ default_constraints = selfies.get_semantic_constraints()
 # new_constraints['S'] = 2
 # new_constraints['P'] = 3
 # selfies.set_semantic_constraints(new_constraints)  # update constraints
-model = joblib.load("activity_prediction/svr_model.pkl")
+model = joblib.load("./activity_prediction/svr_model.pkl")
 # Create JANUS object.
 agent = JANUS(
     work_dir = 'RESULTS_chembl_best_act_mix',                                   # where the results are saved

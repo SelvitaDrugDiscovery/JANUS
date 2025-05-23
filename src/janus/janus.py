@@ -36,7 +36,7 @@ class JANUS:
         num_exchanges: Optional[int] = 5,
         use_fragments: Optional[bool] = True,
         num_sample_frags: Optional[int] = 200,
-        use_classifier: Optional[bool] = True,
+        use_random: Optional[bool] = True,
         explr_num_random_samples: Optional[int] = 5,
         explr_num_mutations: Optional[int] = 5,
         crossover_num_random_samples: Optional[int] = 1,
@@ -60,7 +60,7 @@ class JANUS:
         self.num_exchanges = num_exchanges
         self.use_fragments = use_fragments
         self.num_sample_frags = num_sample_frags
-        self.use_classifier = use_classifier
+        self.use_random = use_random
         self.explr_num_random_samples = explr_num_random_samples
         self.explr_num_mutations = explr_num_mutations
         self.crossover_num_random_samples = crossover_num_random_samples
@@ -238,32 +238,14 @@ class JANUS:
                     Filter may be too strict, or you need more mutations/crossovers.')
 
             # Replace the molecules with ones in exploration mutation/crossover
-            if not self.use_classifier or gen_ == 0:
+            if self.use_random or gen_ == 0:
                 replaced_pop = random.sample(
                     explr_smiles, self.generation_size - len(keep_smiles)
                 )
             else:
                 # The sampling needs to be done by the neural network!
-                print("    Training classifier neural net...")
-                train_smiles, targets = [], []
-                for item in self.smiles_collector:
-                    train_smiles.append(item)
-                    targets.append(self.smiles_collector[item][0])
-                net = create_and_train_network(
-                    train_smiles,
-                    targets,
-                    num_workers=self.num_workers,
-                    use_gpu=self.use_gpu,
-                )
-
                 # Obtain predictions on unseen molecules:
-                print("    Obtaining Predictions")
-                # new_predictions = obtain_model_pred(
-                #     explr_smiles,
-                #     net,
-                #     num_workers=self.num_workers,
-                #     use_gpu=self.use_gpu,
-                # )
+                print("Obtaining Fitness metrics for exploration population...")
                 # REPLACED WITH THE EXACT VALUES FROM THE FITNESS FUNCTION
                 new_predictions = []
                 for smi in explr_smiles:
